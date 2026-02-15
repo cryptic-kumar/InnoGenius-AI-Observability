@@ -11,8 +11,9 @@ import {
   Tooltip,
   Legend,
 } from "chart.js";
+import "./App.css";
 
-// Register Chart components
+// Chart Config
 ChartJS.register(
   CategoryScale,
   LinearScale,
@@ -29,7 +30,6 @@ function App() {
   const [stats, setStats] = useState({ avg_latency: 0, total_requests: 0 });
   const [loading, setLoading] = useState(false);
 
-  // Auto-refresh every 2 seconds
   useEffect(() => {
     const interval = setInterval(fetchStats, 2000);
     return () => clearInterval(interval);
@@ -41,7 +41,7 @@ function App() {
       setStats(res.data);
       if (res.data.recent_decisions) setLogs(res.data.recent_decisions);
     } catch (err) {
-      console.error("Backend offline");
+      console.error("API Error");
     }
   };
 
@@ -54,249 +54,263 @@ function App() {
       });
       fetchStats();
     } catch (err) {
-      alert("Error analyzing claim");
+      alert("Error");
     }
     setLoading(false);
     setClaim("");
   };
 
-  // --- NEW: HANDLE HUMAN FEEDBACK ---
   const handleFeedback = async (id, action) => {
     try {
       await axios.post("http://localhost:5000/human-feedback", {
         log_id: id,
         action: action,
       });
-      fetchStats(); // Update UI immediately
+      fetchStats();
     } catch (err) {
-      alert("Failed to update decision");
+      alert("Failed");
     }
   };
 
-  // --- CHART DATA ---
-  const chartLogs = [...logs].reverse();
+  // Chart Styling
   const chartData = {
-    labels: chartLogs.map((log) => log.timestamp),
+    labels: logs
+      .slice()
+      .reverse()
+      .map((l) => l.timestamp),
     datasets: [
       {
-        label: "AI Latency (ms)",
-        data: chartLogs.map((log) => log.metrics.latency_ms),
-        borderColor: "rgb(75, 192, 192)",
-        backgroundColor: "rgba(75, 192, 192, 0.5)",
-        tension: 0.3,
+        label: "Model Latency (ms)",
+        data: logs
+          .slice()
+          .reverse()
+          .map((l) => l.metrics.latency_ms),
+        borderColor: "#3b82f6",
+        backgroundColor: "rgba(59, 130, 246, 0.1)",
+        tension: 0.4,
+        pointRadius: 4,
       },
     ],
   };
 
   const chartOptions = {
     responsive: true,
-    plugins: {
-      legend: { position: "top" },
-      title: { display: true, text: "Real-Time System Performance" },
+    plugins: { legend: { display: false } },
+    scales: {
+      x: { grid: { color: "#334155" }, ticks: { color: "#94a3b8" } },
+      y: { grid: { color: "#334155" }, ticks: { color: "#94a3b8" } },
     },
   };
 
   return (
-    <div
-      style={{
-        padding: "20px",
-        fontFamily: "Segoe UI, sans-serif",
-        maxWidth: "1200px",
-        margin: "0 auto",
-      }}
-    >
-      <h1 style={{ textAlign: "center", color: "#333" }}>
-        🛡️ AI Insurance Observability
-      </h1>
-
-      {/* KPI Cards */}
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "center",
-          gap: "20px",
-          marginBottom: "30px",
-        }}
-      >
-        <div style={cardStyle}>
-          <h3>Total Requests</h3>
-          <h2>{stats.total_requests}</h2>
-        </div>
-        <div style={cardStyle}>
-          <h3>Avg Latency</h3>
-          <h2>{stats.avg_latency} ms</h2>
-        </div>
-        <div style={cardStyle}>
-          <h3>System Status</h3>
-          <h2 style={{ color: "green" }}>● Online</h2>
+    <div className="dashboard-container">
+      {/* Sidebar */}
+      <div className="sidebar">
+        <div className="logo">🛡️ INSURE.AI</div>
+        <div className="nav-item active">📊 Observability</div>
+        <div className="nav-item">⚖️ Governance</div>
+        <div className="nav-item">⚙️ Settings</div>
+        <div style={{ marginTop: "auto", color: "#64748b", fontSize: "12px" }}>
+          v2.4.0 (Enterprise)
         </div>
       </div>
 
-      <div
-        style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "20px" }}
-      >
-        {/* Left: Input Simulator */}
-        <div style={panelStyle}>
-          <h2>📝 Simulate New Claim</h2>
-          <textarea
-            rows="4"
+      {/* Main Area */}
+      <div className="main-content">
+        {/* Header */}
+        <div className="header">
+          <div>
+            <h2 style={{ margin: 0 }}>Decision Observability</h2>
+            <span style={{ color: "#94a3b8", fontSize: "14px" }}>
+              Real-time monitoring of AI Agents
+            </span>
+          </div>
+          <div className="status-badge">● SYSTEM ONLINE</div>
+        </div>
+
+        {/* KPI Cards */}
+        <div className="kpi-grid">
+          <div className="kpi-card">
+            <div className="kpi-label">Total Claims Processed</div>
+            <div className="kpi-value">{stats.total_requests}</div>
+          </div>
+          <div className="kpi-card">
+            <div className="kpi-label">Avg. Decision Latency</div>
+            <div className="kpi-value">{stats.avg_latency} ms</div>
+          </div>
+          <div
+            className="kpi-card"
             style={{
-              width: "100%",
-              padding: "10px",
-              fontSize: "16px",
-              borderRadius: "5px",
-              border: "1px solid #ddd",
-            }}
-            placeholder="E.g., 20-year-old driver, speeding ticket, bumper damage..."
-            value={claim}
-            onChange={(e) => setClaim(e.target.value)}
-          />
-          <button
-            onClick={handleAnalyze}
-            disabled={loading}
-            style={{
-              marginTop: "10px",
-              padding: "10px 20px",
-              background: "#007bff",
-              color: "white",
-              border: "none",
-              borderRadius: "5px",
-              cursor: "pointer",
-              fontSize: "16px",
+              borderColor:
+                logs[0]?.ai_output.risk_level === "High"
+                  ? "#ef4444"
+                  : "#334155",
             }}
           >
-            {loading ? "AI is Thinking..." : "Analyze Risk 🚀"}
-          </button>
-        </div>
-
-        {/* Right: Live Stream with Actions */}
-        <div style={panelStyle}>
-          <h2>⚡ Live Decision Stream</h2>
-          <div style={{ height: "400px", overflowY: "auto" }}>
-            {logs.map((log) => (
-              <div
-                key={log.id}
-                style={{
-                  background: "#f8f9fa",
-                  padding: "15px",
-                  marginBottom: "10px",
-                  borderRadius: "8px",
-                  borderLeft: `6px solid ${
-                    log.ai_output.decision.includes("Override")
-                      ? "#007bff" // Blue for Human
-                      : log.ai_output.risk_level === "High"
-                        ? "#dc3545"
-                        : "#28a745" // Red/Green for AI
-                  }`,
-                  boxShadow: "0 2px 4px rgba(0,0,0,0.05)",
-                }}
-              >
-                <div
-                  style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                  }}
-                >
-                  <strong style={{ fontSize: "18px" }}>
-                    {log.ai_output.decision}
-                  </strong>
-                  <span style={{ fontSize: "12px", color: "#666" }}>
-                    {log.timestamp}
-                  </span>
-                </div>
-
-                <div style={{ margin: "8px 0", fontSize: "14px" }}>
-                  Risk: <b>{log.ai_output.risk_level}</b> | Confidence:{" "}
-                  <b>{log.ai_output.confidence_score}%</b>
-                </div>
-
-                <div
-                  style={{
-                    fontSize: "13px",
-                    fontStyle: "italic",
-                    color: "#555",
-                    marginBottom: "10px",
-                  }}
-                >
-                  "{log.ai_output.reasoning}"
-                </div>
-
-                {/* --- HUMAN FEEDBACK BUTTONS --- */}
-                {!log.ai_output.decision.includes("Override") && (
-                  <div
-                    style={{
-                      display: "flex",
-                      gap: "10px",
-                      marginTop: "10px",
-                      borderTop: "1px solid #eee",
-                      paddingTop: "10px",
-                    }}
-                  >
-                    <span
-                      style={{
-                        fontSize: "12px",
-                        alignSelf: "center",
-                        color: "#888",
-                      }}
-                    >
-                      Human Override:
-                    </span>
-                    <button
-                      onClick={() =>
-                        handleFeedback(log.id, "Override: Approved")
-                      }
-                      style={{ ...btnStyle, background: "#28a745" }}
-                    >
-                      ✅ Approve
-                    </button>
-                    <button
-                      onClick={() =>
-                        handleFeedback(log.id, "Override: Rejected")
-                      }
-                      style={{ ...btnStyle, background: "#dc3545" }}
-                    >
-                      ❌ Reject
-                    </button>
-                  </div>
-                )}
-              </div>
-            ))}
+            <div className="kpi-label">Current Risk Level</div>
+            <div
+              className="kpi-value"
+              style={{
+                color:
+                  logs[0]?.ai_output.risk_level === "High"
+                    ? "#ef4444"
+                    : "#10b981",
+              }}
+            >
+              {logs[0]?.ai_output.risk_level || "Normal"}
+            </div>
           </div>
         </div>
-      </div>
 
-      {/* Bottom: The Chart */}
-      <div style={{ ...panelStyle, marginTop: "20px" }}>
-        <Line options={chartOptions} data={chartData} height={80} />
+        {/* Main Grid */}
+        <div className="panel-grid">
+          {/* Left Panel: Simulator & Chart */}
+          <div
+            style={{ display: "flex", flexDirection: "column", gap: "20px" }}
+          >
+            <div className="glass-panel">
+              <div className="panel-title">⚡ Claim Simulator</div>
+              <textarea
+                rows="4"
+                placeholder="Paste claim details here..."
+                value={claim}
+                onChange={(e) => setClaim(e.target.value)}
+              />
+              <button
+                className="btn-primary"
+                onClick={handleAnalyze}
+                disabled={loading}
+              >
+                {loading ? "Processing via Gemini..." : "Analyze Claim"}
+              </button>
+            </div>
+
+            <div className="glass-panel" style={{ flex: 1 }}>
+              <div className="panel-title">📈 Latency Trend</div>
+              <Line data={chartData} options={chartOptions} />
+            </div>
+          </div>
+
+          {/* Right Panel: Live Feed */}
+          <div className="glass-panel">
+            <div className="panel-title">
+              <span>👁️ Live Decision Stream</span>
+              <span
+                style={{
+                  fontSize: "12px",
+                  color: "#64748b",
+                  marginLeft: "auto",
+                }}
+              >
+                Auto-updating
+              </span>
+            </div>
+
+            <div
+              style={{
+                maxHeight: "600px",
+                overflowY: "auto",
+                paddingRight: "5px",
+              }}
+            >
+              {logs.map((log) => {
+                const isHighRisk = log.ai_output.risk_level === "High";
+                const isOverride = log.ai_output.decision.includes("Override");
+                const riskColor = isHighRisk
+                  ? "#ef4444"
+                  : log.ai_output.risk_level === "Medium"
+                    ? "#f59e0b"
+                    : "#10b981";
+
+                return (
+                  <div
+                    key={log.id}
+                    className="log-card"
+                    style={{
+                      borderLeft: `4px solid ${isOverride ? "#3b82f6" : riskColor}`,
+                    }}
+                  >
+                    <div className="log-header">
+                      <span className="log-id">LOG_ID: #{log.id}</span>
+                      <span className="log-time">{log.timestamp}</span>
+                    </div>
+
+                    <div
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                      }}
+                    >
+                      <span
+                        className="decision-badge"
+                        style={{
+                          background: isOverride
+                            ? "rgba(59, 130, 246, 0.2)"
+                            : isHighRisk
+                              ? "rgba(239, 68, 68, 0.2)"
+                              : "rgba(16, 185, 129, 0.2)",
+                          color: isOverride ? "#3b82f6" : riskColor,
+                        }}
+                      >
+                        {log.ai_output.decision}
+                      </span>
+                      <span style={{ fontSize: "12px", color: "#94a3b8" }}>
+                        Conf: {log.ai_output.confidence_score}%
+                      </span>
+                    </div>
+
+                    {/* Risk Bar Visual */}
+                    <div className="risk-bar-container">
+                      <div
+                        className="risk-bar-fill"
+                        style={{
+                          width: `${log.ai_output.confidence_score}%`,
+                          background: riskColor,
+                        }}
+                      ></div>
+                    </div>
+
+                    <p
+                      style={{
+                        fontSize: "13px",
+                        color: "#cbd5e1",
+                        margin: "5px 0",
+                        fontStyle: "italic",
+                      }}
+                    >
+                      "{log.ai_output.reasoning}"
+                    </p>
+
+                    {!isOverride && (
+                      <div className="human-actions">
+                        <button
+                          className="action-btn approve"
+                          onClick={() =>
+                            handleFeedback(log.id, "Override: Approved")
+                          }
+                        >
+                          ✓ Approve
+                        </button>
+                        <button
+                          className="action-btn reject"
+                          onClick={() =>
+                            handleFeedback(log.id, "Override: Rejected")
+                          }
+                        >
+                          ✕ Reject
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );
 }
-
-// Simple styles
-const cardStyle = {
-  flex: 1,
-  padding: "20px",
-  background: "white",
-  borderRadius: "8px",
-  boxShadow: "0 2px 5px rgba(0,0,0,0.1)",
-  textAlign: "center",
-};
-const panelStyle = {
-  background: "white",
-  padding: "20px",
-  borderRadius: "8px",
-  boxShadow: "0 2px 5px rgba(0,0,0,0.1)",
-};
-const btnStyle = {
-  padding: "5px 15px",
-  border: "none",
-  borderRadius: "4px",
-  color: "white",
-  cursor: "pointer",
-  fontSize: "12px",
-  fontWeight: "bold",
-};
 
 export default App;
