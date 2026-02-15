@@ -128,6 +128,23 @@ def get_stats():
         "recent_decisions": decision_logs[-5:][::-1]
     })
 
+# --- NEW: HUMAN FEEDBACK ROUTE ---
+@app.route('/human-feedback', methods=['POST'])
+def human_feedback():
+    data = request.json
+    log_id = data.get('log_id')
+    human_action = data.get('action') # "Override: Approved" or "Override: Rejected"
+    
+    # Find the log and update it
+    for log in decision_logs:
+        if log['id'] == log_id:
+            # Update the decision locally
+            log['ai_output']['decision'] = human_action 
+            log['ai_output']['risk_level'] = "Human Reviewed" # Mark as reviewed
+            return jsonify({"message": "Updated successfully", "log": log})
+            
+    return jsonify({"error": "Log not found"}), 404
+
 if __name__ == '__main__':
     print("🚀 Gemini Backend Running on Port 5000...")
     app.run(debug=True, port=5000)

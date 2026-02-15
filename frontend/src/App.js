@@ -57,21 +57,33 @@ function App() {
       alert("Error analyzing claim");
     }
     setLoading(false);
-    setClaim(""); // Clear input after sending
+    setClaim("");
   };
 
-  // --- CHART DATA PREPARATION ---
-  // We take the last 10 logs and reverse them so they flow left-to-right
+  // --- NEW: HANDLE HUMAN FEEDBACK ---
+  const handleFeedback = async (id, action) => {
+    try {
+      await axios.post("http://localhost:5000/human-feedback", {
+        log_id: id,
+        action: action,
+      });
+      fetchStats(); // Update UI immediately
+    } catch (err) {
+      alert("Failed to update decision");
+    }
+  };
+
+  // --- CHART DATA ---
   const chartLogs = [...logs].reverse();
   const chartData = {
-    labels: chartLogs.map((log) => log.timestamp), // X-Axis: Time
+    labels: chartLogs.map((log) => log.timestamp),
     datasets: [
       {
         label: "AI Latency (ms)",
-        data: chartLogs.map((log) => log.metrics.latency_ms), // Y-Axis: Speed
+        data: chartLogs.map((log) => log.metrics.latency_ms),
         borderColor: "rgb(75, 192, 192)",
         backgroundColor: "rgba(75, 192, 192, 0.5)",
-        tension: 0.3, // Makes line curvy
+        tension: 0.3,
       },
     ],
   };
@@ -157,42 +169,97 @@ function App() {
           </button>
         </div>
 
-        {/* Right: Live Stream */}
+        {/* Right: Live Stream with Actions */}
         <div style={panelStyle}>
           <h2>⚡ Live Decision Stream</h2>
-          <div style={{ height: "300px", overflowY: "auto" }}>
+          <div style={{ height: "400px", overflowY: "auto" }}>
             {logs.map((log) => (
               <div
                 key={log.id}
                 style={{
                   background: "#f8f9fa",
-                  padding: "10px",
-                  marginBottom: "8px",
-                  borderRadius: "5px",
-                  borderLeft: `5px solid ${log.ai_output.risk_level === "High" ? "#dc3545" : "#28a745"}`,
+                  padding: "15px",
+                  marginBottom: "10px",
+                  borderRadius: "8px",
+                  borderLeft: `6px solid ${
+                    log.ai_output.decision.includes("Override")
+                      ? "#007bff" // Blue for Human
+                      : log.ai_output.risk_level === "High"
+                        ? "#dc3545"
+                        : "#28a745" // Red/Green for AI
+                  }`,
+                  boxShadow: "0 2px 4px rgba(0,0,0,0.05)",
                 }}
               >
                 <div
-                  style={{ display: "flex", justifyContent: "space-between" }}
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                  }}
                 >
-                  <strong>{log.ai_output.decision}</strong>
+                  <strong style={{ fontSize: "18px" }}>
+                    {log.ai_output.decision}
+                  </strong>
                   <span style={{ fontSize: "12px", color: "#666" }}>
                     {log.timestamp}
                   </span>
                 </div>
-                <div style={{ fontSize: "14px", margin: "5px 0" }}>
+
+                <div style={{ margin: "8px 0", fontSize: "14px" }}>
                   Risk: <b>{log.ai_output.risk_level}</b> | Confidence:{" "}
                   <b>{log.ai_output.confidence_score}%</b>
                 </div>
+
                 <div
                   style={{
-                    fontSize: "12px",
+                    fontSize: "13px",
                     fontStyle: "italic",
                     color: "#555",
+                    marginBottom: "10px",
                   }}
                 >
                   "{log.ai_output.reasoning}"
                 </div>
+
+                {/* --- HUMAN FEEDBACK BUTTONS --- */}
+                {!log.ai_output.decision.includes("Override") && (
+                  <div
+                    style={{
+                      display: "flex",
+                      gap: "10px",
+                      marginTop: "10px",
+                      borderTop: "1px solid #eee",
+                      paddingTop: "10px",
+                    }}
+                  >
+                    <span
+                      style={{
+                        fontSize: "12px",
+                        alignSelf: "center",
+                        color: "#888",
+                      }}
+                    >
+                      Human Override:
+                    </span>
+                    <button
+                      onClick={() =>
+                        handleFeedback(log.id, "Override: Approved")
+                      }
+                      style={{ ...btnStyle, background: "#28a745" }}
+                    >
+                      ✅ Approve
+                    </button>
+                    <button
+                      onClick={() =>
+                        handleFeedback(log.id, "Override: Rejected")
+                      }
+                      style={{ ...btnStyle, background: "#dc3545" }}
+                    >
+                      ❌ Reject
+                    </button>
+                  </div>
+                )}
               </div>
             ))}
           </div>
@@ -207,7 +274,7 @@ function App() {
   );
 }
 
-// Simple styles for clean look
+// Simple styles
 const cardStyle = {
   flex: 1,
   padding: "20px",
@@ -221,6 +288,15 @@ const panelStyle = {
   padding: "20px",
   borderRadius: "8px",
   boxShadow: "0 2px 5px rgba(0,0,0,0.1)",
+};
+const btnStyle = {
+  padding: "5px 15px",
+  border: "none",
+  borderRadius: "4px",
+  color: "white",
+  cursor: "pointer",
+  fontSize: "12px",
+  fontWeight: "bold",
 };
 
 export default App;
